@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
         close(pipe2[0]); 
 
         char command[Buffer];
-        printf("Enter command for process 2: ");
+        printf("Vnesete komanda za proces 2: ");
         fgets(command, Buffer, stdin);
         command[strcspn(command, "\n")] = 0; 
 
@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
         close(pipe2[1]);
 
         execvp(command, args);
-        perror("execvp");
+        pintf("Neuspesno isvrsena comanda execvp");
         exit(EXIT_FAILURE);
     } else if ((pid3 = fork()) == 0) {
         close(pipe1[0]);
@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
         close(pipe2[1]); 
 
         char command[Buffer];
-        printf("Enter command for process 3: ");
+        printf("Vnesete komanda za proces 3: ");
         fgets(command, Buffer, stdin);
         command[strcspn(command, "\n")] = 0; 
 
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
         close(pipe2[0]);
 
         execvp(command, args);
-        perror("execvp");
+        pintf("Neuspesno isvrsena comanda execvp");
         exit(EXIT_FAILURE);
     } else {
        

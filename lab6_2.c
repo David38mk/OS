@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
         }
         args[argc] = NULL;
 
-        dup2(pipe1[1], STDOUT_FILENO); 
+        dup2(pipe1[1], 1); 
         close(pipe1[1]);
 
         execvp(command, args);
@@ -65,8 +65,8 @@ int main(int argc, char *argv[]) {
         }
         args[argc] = NULL;
 
-        dup2(pipe1[0], STDIN_FILENO);  
-        dup2(pipe2[1], STDOUT_FILENO); 
+        dup2(pipe1[0], 0);  
+        dup2(pipe2[1], 1); 
         close(pipe1[0]);
         close(pipe2[1]);
 
@@ -83,17 +83,17 @@ int main(int argc, char *argv[]) {
         fgets(command, Buffer, stdin);
         command[strcspn(command, "\n")] = 0; 
 
-        char *args[argc + 2];
-        args[0] = command;
+        char *argumenti[argc + 2];
+        argumenti[0] = command;
         for (int i = 1; i < argc; i++) {
-            args[i] = argv[i];
+            argumenti[i] = argv[i];
         }
-        args[argc] = NULL;
+        argumenti[argc] = NULL;
 
-        dup2(pipe2[0], STDIN_FILENO); 
+        dup2(pipe2[0], 0); 
         close(pipe2[0]);
 
-        execvp(command, args);
+        execvp(command, argumenti);
         pintf("Neuspesno isvrsena comanda execvp");
         exit(EXIT_FAILURE);
     } else {

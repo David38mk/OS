@@ -20,7 +20,7 @@ else:
 	sys.exit(1)
 
 for lines in vlezna_dat.readlines():
-	words=lines.split()
+	words=lines.split() # split() - na praznite mesta, split('-') split(' ')
 	IP_adress=""
 	IP_adress_mask=""
 	for word in words:
@@ -50,6 +50,7 @@ for lines in vlezna_dat.readlines():
 				for k in range(int(ip[2]),256):
 					for h in range(int(ip[3]),256):
 						print(f"{i}.{j}.{k}.{h}")
+					
 	elif sys.argv[1]=='o':
 		ip = IP_adress.split('.')
 		ip_mask = IP_adress_mask.split('.')

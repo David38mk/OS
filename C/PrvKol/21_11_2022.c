@@ -114,7 +114,6 @@ int main(int argc, char *argv[]){
             // create a dummy result on the heap to keep join logic simple
             int *zero = malloc(sizeof(int));
             *zero = 0;
-            // we could instead set a flag and skip join, but keep simple
         }
     }
 
@@ -133,7 +132,7 @@ int main(int argc, char *argv[]){
         total_occurrences += counts[i];
     }
 
-    // Print percentages after total is known
+    // Printaj procenti na zastapenost
     for (int i = 0; i < num_datoteki; i++) {
         float pct = 0.0f;
         if (total_occurrences > 0) pct = ((float)counts[i] / (float)total_occurrences) * 100.0f;

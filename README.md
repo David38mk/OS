@@ -53,6 +53,8 @@ docker compose down                 # stop
 
 Inside: `cd ~/OS`, then `./run.sh course/2024/Exams/partial_one/Z3.c ...` or `bash tests/run_tests.sh` in a lab folder. Kernel-module (driver) tasks cannot be built here; only a real VM can load modules.
 
+Full instructions, maintenance and an explanation of how containers, WSL2 and the bind mount work: [docker/README.md](docker/README.md).
+
 ## Exams
 
 | Folder | Date | Z1 | Z2 | Z3 / notes |

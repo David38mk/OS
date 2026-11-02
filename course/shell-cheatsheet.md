@@ -1,6 +1,6 @@
 # Bash Shell Cheat Sheet – study guide for the OS labs and exams
 
-A reference and a brush-up manual in one. Read sections 0 to 8 in order once (they explain how the shell thinks), then use the rest as a lookup. Every example is written the way the course tasks need it: Linux, `bash`, GNU tools. Lines starting with `$` are typed at the prompt, lines without it are output.
+A reference and a brush-up manual in one. Read sections 0 to 8 in order once (they explain how the shell thinks) and section 10 before you touch `grep`, `sed` or `awk`, then use the rest as a lookup. Every example is written the way the course tasks need it: Linux, `bash`, GNU tools. Lines starting with `$` are typed at the prompt, lines without it are output.
 
 Where a recipe comes straight from an exam or lab in this repo, the folder is named so you can open the full solution.
 
@@ -112,7 +112,7 @@ Behaviour to remember:
 
 ### Glob vs. regular expression
 
-They look alike and mean different things. Globs are matched by the shell against file names; regexes are matched by `grep`, `sed`, `awk` and `[[ =~ ]]` against text.
+They look alike and mean different things. Globs are matched by the shell against file names; regexes are matched by `grep`, `sed`, `awk` and `[[ =~ ]]` against text. Section 10 has the symbol-by-symbol comparison and says which program interprets what.
 
 | Meaning | Glob (shell, `find -name`, `case`) | Regex (`grep`, `sed`, `awk`) |
 |---|---|---|
@@ -521,7 +521,369 @@ first=$(find . -type f -name "$name" | head -1)      # first match, or empty
 
 ---
 
-## 10. `grep` in depth
+## 10. Patterns: who interprets what, and regular expressions in depth
+
+Three different pattern languages show up on one command line, and the same symbol means different things in each. Getting this straight removes most of the confusion around `grep`, `sed` and `awk`.
+
+### 10.1 Two layers: the shell goes first, the program goes second
+
+Every command line is processed twice. **Bash** reads it first and handles quotes, `$variables`, globs, pipes and redirections (section 0). Only then does it start the program (`grep`, `sed`, `awk`, `find`) and hand it the remaining words. The program never sees your quotes; it sees the result. So the question for every special character is: *do I want bash to act on this, or do I want to deliver it untouched to the program?*
+
+- Want bash to act (expand a variable, match file names, pipe): leave it unquoted, or in double quotes for variables.
+- Want the program to get it untouched (a regex, a `find -name` pattern, an awk program): single quotes.
+
+Trick to see what the program will actually receive: put `echo` in front of the command.
+
+```bash
+$ echo grep -E lab[0-9]+.c$ *.txt        # bash expanded *.txt, and would also expand lab[0-9]+.c$ if a file matched
+grep -E lab[0-9]+.c$ a.txt b.txt
+$ echo grep -E 'lab[0-9]+\.c$' *.txt     # the pattern arrives intact
+grep -E lab[0-9]+\.c$ a.txt b.txt
+```
+
+### 10.2 The same symbol in the shell and in a regex
+
+| Symbol | Bash, unquoted | Inside a regex (grep/sed/awk) | Safe way to send it to the program |
+|---|---|---|---|
+| `*` | glob: any characters **in a file name** (`*.c`) | repeat the previous item 0 or more times (`[0-9]*`) | single quotes |
+| `?` | glob: one character in a file name | previous item optional (`colou?r`) | single quotes |
+| `[abc]`, `[a-z]` | glob: one character from the set, in a file name | one character from the set, in the text | single quotes (same syntax, different target) |
+| `[!abc]` / `[^abc]` | glob negation is `!` | regex negation is `^` | |
+| `{a,b}`, `{1,3}` | **brace expansion**: `echo [0-9]{1,3}` prints `[0-9]1 [0-9]3` | repetition count: `[0-9]{1,3}` | single quotes, or the pattern silently breaks |
+| `\|` | pipe between commands | ERE alternation (`BTC\|ETH`) | single quotes |
+| `$` | start of a variable (`$x`, `$(cmd)`) | end of line (`\.c$`) | single quotes; in double quotes write `\$` |
+| `^` | nothing special | start of line | |
+| `( )` | subshell | group | single quotes |
+| `\` | escape the next character | escape (`\.`) or special class (`\b`, `\<`) | single quotes; in double quotes `\.` survives but `\\` becomes `\` |
+| `.` | nothing special | any single character | |
+| `#` | start of a comment | literal; also a common `s#a#b#` delimiter in sed | single quotes |
+| `&` | run in background | sed replacement: the whole match | single quotes |
+| `<` `>` | redirection | GNU `\<` `\>` word start / end | single quotes |
+| `;` | separates commands | separates sed commands (`'/^#/d; /^$/d'`) | single quotes |
+| `~` | home directory | awk match operator (`$1 ~ /re/`) | single quotes |
+| `!` | history expansion in an interactive shell, also inside `"..."` | nothing | avoid in double quotes at the prompt |
+| space | separates arguments | literal space | quote a pattern that contains one |
+
+Rule that follows from the table: **a regex goes in single quotes, always.** Switch to double quotes only for the part that must contain a variable, and escape `$` there if it means end-of-line: `grep -E "^$name:.*\$"` or, cleaner, `grep -E '^'"$name"':.*$'`.
+
+### 10.3 Three pattern languages and where each one is used
+
+| Language | Matches against | Used by | Example |
+|---|---|---|---|
+| **Glob** | file names, or a whole string | bash command line, `case`, `[[ $s == pat ]]`, `${var#pat}` `${var%pat}` `${var/pat/rep}`, `find -name` | `*.c`, `Z[1-3].sh`, `${f%.*}` |
+| **Regex** | text, anywhere inside a line unless anchored | `grep`, `sed`, `awk`, `[[ $s =~ re ]]`, `find -regex`, `expr` | `^[0-9]+$`, `\.c$` |
+| **Fixed string** | exact characters, nothing special | `grep -F`, awk `index()`, bash `==` with a quoted right side | `grep -F '1.5'` |
+
+The surprise in that table: bash's own string operators use **glob** syntax, not regex. `${f%.*}` removes the shortest suffix matching the glob `.*` (a dot and anything), `${s//[0-9]/}` deletes digits with a glob set, and `case $x in *.py)` is a glob. Only `[[ =~ ]]` uses a regex. A glob always has to match the **whole** string, a regex matches a **part** unless you write `^` and `$`.
+
+### 10.4 Which tool for which job
+
+| I want to... | Use | Pattern type |
+|---|---|---|
+| pick files by name in this directory | a glob: `for f in *.c` | glob |
+| pick files by name anywhere below | `find . -name '*.c'` (or `-regex` for complex names) | glob (regex with `-regex`) |
+| know whether a string or variable has a shape | `[[ $x =~ ^[0-9]+$ ]]` | regex |
+| branch on the shape of a string | `case "$x" in *.py\|*.py3) ...` | glob |
+| strip or replace part of a variable | `${f%.c}`, `${f##*/}`, `${s/old/new}` | glob |
+| find the lines that contain something | `grep -E` | regex |
+| know if a file contains something (for `if`) | `grep -qE` | regex |
+| pull the matching pieces out of text | `grep -oE`, or `sed -E 's/.*(group).*/\1/'` | regex |
+| change text in a stream or a file | `sed -E 's/.../.../'`, `sed -i` | regex |
+| work with columns, numbers, sums | `awk` | fields; regex to select rows |
+| count lines that match | `grep -cE`, or `awk '/re/ {n++} END {print n}'` | regex |
+| search for text with dots or stars in it literally | `grep -F`, `awk 'index($0, w)'` | fixed string |
+
+### 10.5 Three regex dialects
+
+| Where | Dialect | What it means for you |
+|---|---|---|
+| `grep`, `sed` without `-E` | BRE, basic | `+ ? \| ( ) { }` are **literal**. For the special meaning write `\+ \? \| \( \) \{ \}` |
+| `grep -E`, `sed -E`, `awk`, bash `[[ =~ ]]` | ERE, extended | the special characters work bare; `\(` is a literal parenthesis |
+| `grep -P` | PCRE, Perl | adds `\d \w \s`, lazy `*?`, lookahead. Not available in sed or awk |
+
+Use `-E` everywhere and you only need to learn one syntax. All examples below assume it. Two traps that follow:
+
+- **`\d` does not exist** in ERE. On the lab machines' GNU grep 3.11 `grep -E '\d'` quietly matches a literal `d`. Write `[0-9]` or `[[:digit:]]`.
+- GNU grep and GNU sed add `\b \< \> \w \W \s \S`. Ubuntu's default `awk` is **mawk**, which supports **none** of them. In awk use `[[:space:]]`, `[[:alnum:]_]` and compare whole fields instead of word boundaries.
+
+### 10.6 Building blocks, each with a runnable example
+
+**Literal text, and escaping the specials.** In ERE these are special: `. * + ? [ ] ( ) { } | ^ $ \`. A backslash makes them literal. Inside `[...]` only `] \ ^ -` are special.
+
+```bash
+echo 'cena: $5.00' | grep -E '\$5\.00'      # escape $ and .  (unescaped . would also match "5x00")
+echo 'cena: $5.00' | grep -F '$5.00'        # or -F: nothing is special
+grep -E '\.c$' list.txt                      # names ending in .c
+grep -E '\[ERROR\]' app.log                  # a literal [ERROR]
+```
+
+**`.` any single character.**
+
+```bash
+printf 'lab\nlib\nl5b\nlb\n' | grep -E 'l.b'   # lab lib l5b   (not lb: exactly one character)
+grep '192.168.1.1' hosts                       # BUG: also matches 192x168-1-1
+grep -E '\b192\.168\.1\.1\b' hosts             # correct
+```
+
+**Character sets `[...]`.**
+
+| Set | Meaning |
+|---|---|
+| `[abc]` | one of a, b, c |
+| `[a-z]`, `[0-9]`, `[a-zA-Z0-9]` | ranges |
+| `[^0-9]` | one character that is **not** a digit |
+| `[]abc]`, `[a-]` | a literal `]` goes first, a literal `-` goes last |
+| `[[:digit:]]` `[[:alpha:]]` `[[:alnum:]]` `[[:upper:]]` `[[:lower:]]` `[[:space:]]` `[[:punct:]]` `[[:xdigit:]]` | POSIX classes, used **inside** the brackets |
+
+POSIX classes follow the locale: `[[:alpha:]]` matches `Скопје`, `[a-zA-Z]` does not.
+
+```bash
+grep -E '^[A-Z]' names.txt                 # starts with a capital
+grep -E '^[[:alpha:]]+$' words.txt         # letters only, Cyrillic included
+echo 'Z1 Z2 z3' | grep -oE 'Z[0-9]'        # Z1 Z2
+grep -nE '[[:space:]]$' s.sh               # lines with trailing whitespace
+grep -E '[^[:print:]]' f                   # lines with control characters (a CR, for example)
+```
+
+**Anchors `^` and `$`.** Without them a regex matches anywhere in the line.
+
+```bash
+grep -E '^#' s.sh              # comment lines
+grep -cE '^$' f                # how many empty lines
+grep -E '^[0-9]+$' f           # the whole line is a number
+grep -E '\.py3?$' list         # ends with .py or .py3
+sed -E 's/^/    /' f           # insert at the start of every line (indent)
+sed -E 's/$/;/' f              # append to every line
+```
+
+**Quantifiers** apply to the item just before them.
+
+| `*` | `+` | `?` | `{3}` | `{2,}` | `{1,3}` |
+|---|---|---|---|---|---|
+| 0 or more | 1 or more | 0 or 1 | exactly 3 | 2 or more | 1 to 3 |
+
+```bash
+grep -oE '[0-9]+' f                          # every run of digits
+grep -E '^[0-9]{2}-[0-9]{2}-[0-9]{4}' f      # starts with dd-mm-yyyy
+echo 'colour color colr' | grep -oE 'colou?r'   # colour color
+grep -E '^-?[0-9]+(\.[0-9]+)?$' f            # integer or decimal, optional minus
+grep -E 'a{2,}' f                            # aa, aaa, ...
+```
+
+**Greedy matching.** `*` and `+` grab as much as they can while the whole pattern still matches. On `say "hi" and "bye"`, `s/".*"//` removes from the first quote to the **last** one and leaves `say `. To stop at the next quote use a negated set instead of `.`:
+
+```bash
+echo 'say "hi" and "bye"' | sed -E 's/".*"//'        # say
+echo 'say "hi" and "bye"' | sed -E 's/"[^"]*"//'     # say  and "bye"
+```
+
+The same idea gives "up to the next comma" `[^,]*`, "up to the next slash" `[^/]*`, "the part before @" `[^@]+`. It is the single most useful regex habit.
+
+**Alternation `|` and grouping `( )`.**
+
+```bash
+grep -wE 'BTC|Doge|EOS|ETH|XPM' f.crypto      # any of the words
+grep -E '^(ERROR|WARN):' log                  # group, so ^ applies to both
+grep -E '^ERROR|WARN:' log                    # different: "starts with ERROR" OR "contains WARN:" anywhere
+grep -E '(ab)+' f                             # ab, abab, ...
+grep -E 'lab(3|31|4)\.c' f
+```
+
+**Groups and back-references.** `\1` to `\9` stand for what group N matched. In sed they rebuild the replacement, in grep they demand a repeat.
+
+```bash
+echo '21-11-2024' | sed -E 's/([0-9]{2})-([0-9]{2})-([0-9]{4})/\3-\2-\1/'   # 2024-11-21
+echo 'Ime Prezime' | sed -E 's/([^ ]+) ([^ ]+)/\2 \1/'                       # Prezime Ime
+echo 'key=value'   | sed -E 's/^([^=]+)=(.*)$/\2=\1/'                        # value=key
+grep -E '\b([a-z]+) \1\b' f                   # a word repeated twice in a row ("the the")
+echo 'a1b22' | sed -E 's/[0-9]+/[&]/g'        # a[1]b[22]   & = the whole match
+```
+
+awk's `sub`/`gsub` know `&` but not `\1`; use `match()` + `substr()` or `split()` there (10.7).
+
+**Word boundaries** (GNU grep and sed only).
+
+```bash
+grep -E '\bETH\b' f       # ETH, not ETHX or METH   (same as grep -w ETH)
+grep -E '\<lab' f         # words starting with lab
+grep -E 'ing\>' f         # words ending with ing
+awk '$0 ~ /(^|[^[:alnum:]])ETH([^[:alnum:]]|$)/' f    # the awk way, since mawk has no \b
+awk '$1 == "ETH"' f                                    # or compare a whole field
+```
+
+**Case-insensitive.**
+
+```bash
+grep -iE 'error' log
+sed -E 's/error/E/Ig' log               # I flag on s
+awk 'tolower($0) ~ /error/' log
+```
+
+**A variable inside the pattern.** Only the variable needs double quotes.
+
+```bash
+grep -E "^$zbor" f                       # the whole pattern is simple: double quotes are fine
+grep -E '^'"$zbor"':[0-9]+$' f           # literal parts single-quoted, variable double-quoted, no spaces between
+grep -F -- "$zbor" f                     # the variable may contain . or *: -F takes it literally
+sed -E "s/$star/$nov/g" f                # breaks if $star contains /  ->  use another delimiter:
+sed -E "s#$star#$nov#g" f
+awk -v w="$zbor" '$0 ~ w' f              # pass it in with -v; w is used as a regex
+awk -v w="$zbor" 'index($0, w)' f        # literal substring instead
+```
+
+**Bash's own regex test `[[ =~ ]]`.** The pattern is unquoted; quoting makes it literal. Captures land in `BASH_REMATCH`.
+
+```bash
+[[ "$n" =~ ^[0-9]+$ ]]               || { echo "Ne e cel broj"; exit 1; }
+[[ "$x" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]  || { echo "Ne e broj"; exit 1; }
+[[ "$f" =~ \.(py|py3)$ ]]            && echo "python skripta"
+if [[ "$ip" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then
+    echo "prv oktet: ${BASH_REMATCH[1]}"
+fi
+re='^[a-z]+ [0-9]+$'; [[ "$s" =~ $re ]]    # a pattern with spaces goes in a variable
+```
+
+### 10.7 How each tool uses a regex
+
+**grep** selects lines. With `-o` it becomes an extractor.
+
+```bash
+grep -E 'pat' f             # lines containing a match
+grep -vE 'pat' f            # lines without one
+grep -cE 'pat' f            # how many lines match
+grep -oE 'pat' f | wc -l    # how many matches (one line can hold several)
+grep -oE 'pat' f | sort -u  # the distinct things that matched
+grep -lE 'pat' *.txt        # which files
+grep -xE 'pat' f            # the whole line must match (= ^pat$)
+```
+
+**sed** uses a regex in two places: as an **address** (which lines) and inside **`s`** (what to change).
+
+```bash
+sed -n -E '/^ERROR/p' log                  # print matching lines (= grep)
+sed -E '/^#/d; /^$/d' f                    # delete comments and blank lines
+sed -E '/^BEGIN/,/^END/d' f                # delete from a matching line to another
+sed -E 's/[[:space:]]+$//' f               # strip trailing whitespace
+sed -E 's/^[[:space:]]+//' f               # strip leading
+sed -E 's/[[:space:]]+/ /g' f              # squeeze whitespace runs to one space
+sed -E 's/.*: //' f                        # keep what follows the LAST ": " (greedy)
+sed -E 's/^([^:]*): .*/\1/' f              # keep what is BEFORE the first ": "
+sed -n -E 's/^PORT=(.*)/\1/p' app.conf     # extract a value: print only when the s matched
+sed -E '/^PORT=/ s/=.*/=8080/' app.conf    # change the value only on that line
+sed -E 's/\r$//' f                         # CRLF -> LF
+```
+
+**awk** tests the whole line or one field, and has regex functions.
+
+```bash
+awk '/ERROR/' log                          # lines matching (default action is print)
+awk '!/^#/' f                              # lines NOT matching
+awk '$2 ~ /^[0-9]+$/' f                    # field 2 is a number
+awk '$1 !~ /^lab/' f                       # field 1 does not start with lab
+awk '/^10:/,/^11:/' log                    # range, like sed
+awk -F'[,;]' '{print $2}' f                # regex as field separator: comma or semicolon
+awk -F' +' '{print $3}' f                  # one or more spaces (the default FS already does this)
+awk '{gsub(/[^0-9]/, "", $2); print $2}' f                              # keep only digits in field 2
+awk 'match($0, /[0-9]+\.[0-9]+/) {print substr($0, RSTART, RLENGTH)}' f  # extract the first decimal
+awk '{split($0, a, /[-\/]/); print a[3] "-" a[2] "-" a[1]}' dates.txt    # split on - or /
+```
+
+### 10.8 Worked examples from the course
+
+**Dates `dd-mm-yyyy`** (2019/20 exam: count dated lines in a generated file)
+
+```bash
+grep -cE '^[0-9]{2}-[0-9]{2}-[0-9]{4}' out.txt                        # lines that start with a date
+grep -oE '\b[0-9]{2}-[0-9]{2}-[0-9]{4}\b' out.txt                      # every date in the file
+sed -E 's/\b([0-9]{2})-([0-9]{2})-([0-9]{4})\b/\3-\2-\1/g' out.txt     # to yyyy-mm-dd
+grep -oE '\b[0-9]{2}-[0-9]{2}-[0-9]{4}\b' out.txt | cut -d- -f2 | sort | uniq -c   # how many per month
+grep -E '^[0-9]{2}-(0[1-9]|1[0-2])-[0-9]{4}' out.txt                   # month must be 01-12
+```
+
+**IPv4 addresses** (20.11.2023 exam: a thread per IP in a file)
+
+```bash
+grep -cE '^([0-9]{1,3}\.){3}[0-9]{1,3}$' ips.txt                        # IP-shaped lines
+grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' access.log | sort | uniq -c | sort -rn   # top IPs in a log
+awk -F. 'NF==4 && $1<=255 && $2<=255 && $3<=255 && $4<=255' ips.txt     # shape is not enough: 999.1.1.1 passes the regex
+grep -oE '^[0-9]{1,3}' ips.txt | sort -n | uniq -c                      # count by first octet
+```
+
+**E-mails** (Lab 1 2026, Doma Z3)
+
+```bash
+grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' f       # extract them
+grep -oE '@[A-Za-z0-9.-]+' f | sort | uniq -c                      # count per domain
+grep -vE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' f       # lines WITHOUT a valid address
+sed -E 's/\b[A-Za-z0-9._%+-]+@(([A-Za-z0-9-]+\.)+[A-Za-z]{2,})\b/?@\1/g' f   # censor; section 12 has the strict version
+```
+
+**Crypto values** (21.11.2024 exam: files with BTC/Doge/EOS/ETH/XPM and numbers to sum)
+
+```bash
+grep -lwE 'BTC|Doge|EOS|ETH|XPM' *.crypto                        # which files mention a coin
+grep -oE '[0-9]+(\.[0-9]+)?' all.crypto | wc -l                  # how many numbers
+grep -oE '[0-9]+(\.[0-9]+)?' all.crypto | awk '{s+=$1} END {print s}'   # their sum
+awk '$0 ~ /(^|[^[:alnum:]])ETH([^[:alnum:]]|$)/ {print FILENAME ": " $0}' *.crypto   # whole-word ETH, in awk
+```
+
+**Key words in source files** (Lab 1 2026, Z3)
+
+```bash
+grep -l password *.py                                            # substring: also matches my_password
+grep -lw password *.py                                           # whole word only
+grep -nE 'password[[:space:]]*=[[:space:]]*"[^"]*"' *.py         # assignments with a quoted value
+grep -ohE 'password[[:space:]]*=[[:space:]]*"[^"]*"' *.py | sed -E 's/.*"([^"]*)"/\1/'   # just the values
+```
+
+**Config files and logs**
+
+```bash
+sed -n -E 's/^[[:space:]]*port[[:space:]]*=[[:space:]]*//Ip' app.conf      # value of port=, any case and spacing
+grep -oE '^\[[^]]+\]' app.ini | tr -d '[]'                                 # section names from [name] headers
+awk '/^(ERROR|WARN)/ {c[$1]++} END {for (k in c) print k, c[k]}' app.log   # count per level
+sed -n -E '/^2024-11-21 10:/,/^2024-11-21 11:/p' app.log                   # one hour of a log
+```
+
+**File names**
+
+```bash
+ls -1 | grep -E '^lab[0-9]+(_[0-9]+)?\.c$'         # lab4.c lab4_2.c, not lab.c
+ls -1 | grep -iE '\.(jpe?g|png)$'                  # images, any case
+for f in lab*.c; do mv -n "$f" "$(echo "$f" | sed -E 's/^lab([0-9]+)/Lab\1/')"; done   # rename by regex
+find . -regextype posix-extended -regex '.*/Z[0-9]+\.(sh|py3?)'       # find by regex on the whole path
+```
+
+### 10.9 Debugging a regex
+
+- Build it up on sample text: `echo 'tekst' | grep -oE 'pattern'`. `-o` shows exactly what matched, `--color` highlights it in the line.
+- No match at all? Did you forget `-E` (then `+ ? ( ) |` are literal)? Is the pattern in single quotes? Is there a hidden `\r` at the line ends? `cat -A f` shows tabs as `^I`, carriage returns as `^M` and line ends as `$`.
+- Too much matched? A `.*` is being greedy. Replace `.` with a negated set: `[^"]`, `[^,]`, `[^ ]`.
+- `\d`, `\w`, `\s` do nothing useful outside `grep -P`. Use `[0-9]`, `[[:alnum:]_]`, `[[:space:]]`.
+- In awk (mawk) `\b \< \> \w \s` are not supported. Use POSIX classes or compare whole fields.
+- Put `echo` in front of the whole command to see what bash hands to the program (10.1).
+
+### 10.10 Regex quick table
+
+| Pattern | Meaning | Example |
+|---|---|---|
+| `abc` | literal text, anywhere in the line | `abc` in `xabcx` |
+| `.` | any one character | `l.b` matches `lab`, `l5b` |
+| `[abc]` `[a-z]` `[^0-9]` | set, range, negated set | |
+| `[[:digit:]]` `[[:alpha:]]` `[[:space:]]` `[[:alnum:]]` | POSIX classes, inside brackets | |
+| `^` `$` | line start, line end | `^#`, `\.c$` |
+| `*` `+` `?` | 0 or more, 1 or more, 0 or 1 of the previous item | `[0-9]+` |
+| `{n}` `{n,}` `{n,m}` | exact, at least, between | `[0-9]{1,3}` |
+| `a\|b` | either | `BTC\|ETH` |
+| `( )` | group: for alternation, quantifiers and `\1` | `([0-9]{1,3}\.){3}` |
+| `\1` | what group 1 matched (sed replacement, grep pattern) | `s/(.)(.)/\2\1/` |
+| `&` | the whole match (sed replacement, awk sub/gsub) | `s/[0-9]+/<&>/` |
+| `\b` `\<` `\>` | word boundary, word start, word end (GNU grep and sed only) | `\bETH\b` |
+| `\.` `\$` `\*` `\[` | the literal character | |
+
+---
+
+## 11. `grep` in depth
 
 `grep [options] PATTERN [files]`. Prints the **lines** that match. Exit status: 0 found, 1 nothing found, 2 error, so it works directly in `if`.
 
@@ -544,24 +906,7 @@ first=$(find . -type f -name "$name" | head -1)      # first match, or empty
 | `-m 1` | stop after the first match |
 | `-s` | no "file not found" errors |
 
-### Regular expressions (the parts you need)
-
-| | Meaning |
-|---|---|
-| `.` | any one character |
-| `*` | previous item 0 or more times |
-| `+` | 1 or more (ERE; `\+` in basic grep) |
-| `?` | 0 or 1 (ERE) |
-| `{3}`, `{1,3}`, `{2,}` | exactly / between / at least |
-| `^`, `$` | start / end of line |
-| `[abc]`, `[0-9]`, `[^0-9]` | one char from set / range / not in set |
-| `[[:digit:]]`, `[[:alpha:]]`, `[[:alnum:]]`, `[[:space:]]`, `[[:upper:]]` | POSIX classes |
-| `a\|b` (basic) or `a|b` (ERE) | alternation |
-| `(ab)+` | grouping (ERE) |
-| `\.` `\$` `\*` | a literal special character |
-| `\b`, `\<`, `\>` | word boundary, word start, word end |
-
-Basic grep (no `-E`) treats `+ ? | ( ) { }` as literal characters and needs `\+ \? \| \( \) \{ \}` for the special meaning. Use `-E` and forget about it.
+The pattern is a regex: section 10 explains the syntax, the shell-versus-regex symbol clash and the `-E` dialect used here.
 
 Recipes:
 
@@ -583,7 +928,7 @@ ls -1 | grep -E '\.c$'                                       # .c files via grep
 
 ---
 
-## 11. `sed` in depth
+## 12. `sed` in depth
 
 Stream editor: reads line by line, applies commands, prints the result. Does not change the file unless `-i`.
 
@@ -643,7 +988,7 @@ Reading it: `\b` word boundary, `[A-Za-z0-9._%+-]+` the part before `@`, then th
 
 ---
 
-## 12. `awk` essentials
+## 13. `awk` essentials
 
 A small language for columns. Each line is a record, split into fields `$1 $2 …`; `$0` is the whole line, `NF` the number of fields, `NR` the line number. Default separator is any run of spaces/tabs, so it beats `cut` on aligned output.
 
@@ -668,7 +1013,7 @@ Structure: `BEGIN { before any line }  pattern { per matching line }  END { afte
 
 ---
 
-## 13. Text toolbox
+## 14. Text toolbox
 
 | Command | Flags | Example |
 |---|---|---|
@@ -698,7 +1043,7 @@ Structure: `BEGIN { before any line }  pattern { per matching line }  END { afte
 
 ---
 
-## 14. Processes, jobs, signals, permissions, system
+## 15. Processes, jobs, signals, permissions, system
 
 ### Jobs and background
 
@@ -774,7 +1119,7 @@ Timing a program from a script: `start=$(date +%s); ./prog; echo "$(( $(date +%s
 
 ---
 
-## 15. Exam recipes
+## 16. Exam recipes
 
 Patterns that appear again and again in the first partial. Each is a complete skeleton.
 
@@ -888,7 +1233,7 @@ done < naredbi.txt
 
 ---
 
-## 16. Pitfalls checklist
+## 17. Pitfalls checklist
 
 - `x = 5` is a command named `x` with two arguments. No spaces around `=` in assignments.
 - `[$a = $b]` or `[ $a=$b ]`: `[` needs spaces on both sides of every token.
@@ -909,10 +1254,15 @@ done < naredbi.txt
 - `#!/bin/sh` is not bash: no arrays, no `[[ ]]`, no `$'…'`. Use `#!/bin/bash`.
 - A background job's exit status is only available via `wait $pid`.
 - Globs that match nothing stay literal: `for f in *.txt` runs once with `f='*.txt'`. Guard with `[ -e "$f" ]`.
+- A regex outside single quotes: bash eats it first. `[0-9]{1,3}` becomes `[0-9]1 [0-9]3` (brace expansion), `$` starts a variable, `*` may expand to file names.
+- `grep` or `sed` without `-E`: `+ ? ( ) | { }` are literal characters, so the pattern quietly matches the wrong thing or nothing.
+- `\d` is not a digit in grep, sed or awk. `[0-9]` is.
+- `${f%.*}`, `case`, `[[ == ]]` and `find -name` use glob syntax. Only `[[ =~ ]]`, grep, sed, awk and `find -regex` use regex.
+- `.*` is greedy and runs to the last possible match. `[^"]*`, `[^,]*` stop at the next quote or comma.
 
 ---
 
-## 17. Quick reference
+## 18. Quick reference
 
 | Command | What it does | Typical call |
 |---|---|---|

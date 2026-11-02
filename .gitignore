@@ -1,0 +1,7 @@
+# build output
+bin/
+*.exe
+*.o
+a.out
+lab31
+__pycache__/

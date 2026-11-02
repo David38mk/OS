@@ -1,0 +1,6 @@
+# Scripts run on Linux/WSL, so keep LF in the working copy even on Windows
+*.sh   text eol=lf
+*.py   text eol=lf
+*.py3  text eol=lf
+*.pdf  binary
+*.docx binary

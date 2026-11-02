@@ -30,7 +30,7 @@ Conventions:
 
 ## Running
 
-Everything targets Linux, so use WSL or a lab machine:
+Everything targets Linux. The quickest way on Windows is the Docker container below; WSL or a lab machine also work:
 
 ```bash
 ./run.sh course/2024/Exams/partial_one/Z3.c btc.txt eth.txt   # gcc -Wall -pthread, then runs bin/Z3
@@ -39,6 +39,19 @@ Everything targets Linux, so use WSL or a lab machine:
 ```
 
 Two-program tasks (`course/2025/Labs/Lab3/threads`) are built by hand: program 1 execs `./lab31`, so compile `lab31.c` to `lab31` in the same folder first.
+
+## Linux test environment (Docker)
+
+`docker-compose.yml` builds an Ubuntu 24.04 container with gcc, gdb, python3 and an SSH server. The repo is bind-mounted at `/home/david/OS`, so you edit on Windows and run inside Linux.
+
+```bash
+docker compose up -d --build        # first start builds the image (a few minutes), later starts take seconds
+ssh -p 2222 david@localhost         # key auth with ~/.ssh/id_ed25519, fallback password: os
+docker exec -it oslab bash          # same shell without ssh
+docker compose down                 # stop
+```
+
+Inside: `cd ~/OS`, then `./run.sh course/2024/Exams/partial_one/Z3.c ...` or `bash tests/run_tests.sh` in a lab folder. Kernel-module (driver) tasks cannot be built here; only a real VM can load modules.
 
 ## Exams
 

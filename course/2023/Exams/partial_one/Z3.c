@@ -1,145 +1,91 @@
-//  Да се напише програма во C која работи со процеси и нитки. Програмата (главната
-// нитка) како аргументи од командна линија добива збор што се пребарува и листа од
-// имиња на датотеки. Доколку не добие листа од датотеки од командна линија (добие
-// 120
-// мин.
-// само збор за пребарување), програмата треба да му дозволи да внесе имиња на 3
-// датотеки од тастатура. Доколку нема ни збор за пребарување, најпрво го внесува зборот
-// од тастатура, а потоа имињата на 3те датотеки. За секоја датотека во која се прави
-// пребарување, се креира посебна нитка која го прави пребарувањето, притоа, на секоја
-// нитка ѝ се испраќа кој е зборот што треба да го пребарува и името на датотеката во која
-// треба да го прави пребарувањето. Секоја нитка го пребарува зборот во својата датотека,
-// и штом заврши, на екран го печати името на датотеката и колку пати се појавил зборот.
-// Откако ќе завршат сите нитки, главната нитка на екран печати, за секоја датотека
-// одделно, колку процентуално се појавил зборот во таа датотека (процент од вкупното
-// појавување на зборот во сите датотеки).
-
+// Да се напише програма во C која работи со процеси и нитки. Програмата (главната нитка) како
+// аргумент од командна линија добива име на влезна датотека. Во влезната датотека, во секој ред
+// одделно, се сместени IP адреси (формат: х.х.х.х, каде х е број од 0 до 255). Главната нитка треба
+// да креира онолку нитки колку што има IP адреси во датотеката. Секоја нитка, пресметува колку
+// можни IP адреси може да генерира, почнувајќи од IP адресата што ја добива, до 255 бројот за
+// секој дел од x.y.z.k. Генерирањето на IP адресите се прави така што к оди до 255, па потоа се
+// зголемува z, а к почнува од 0 и т.н. Секоја нитка треба да пресмета колку може да генерира IP
+// адреси. На крај, главниот процес(нитка) печати на екран, колку вкупно (од сите нитки) може да
+// се генерираат IP адреси. За конвертирање на низа од знаци во цел број, може да се користи
+// функцијата atoi(char *)
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <pthread.h>
+#include <sys/wait.h>
 
-#define MAX_FILES 100
-#define MAX_NAME 256
-#define MAX_WORD 256
-
-char global_zbor[MAX_WORD];
-
-void *prebaraj_vo_datoteka(void *arg){
-    char *ime_dat = (char *)arg;
-    FILE *fp = fopen(ime_dat, "r");
-    if (!fp) {
-        fprintf(stderr, "Ne mozam da ja otvoram datotekata %s\n", ime_dat);
-        int *zero = malloc(sizeof(int));
+void *najdi_ip_adresi(void *num){
+    int idx = *(int *)num;
+    char *ip = ip_adresi[idx];
+    int delovi[4];
+    if (sscanf(ip, "%d.%d.%d.%d", &delovi[0], &delovi[1], &delovi[2], &delovi[3]) != 4) {
+        long long *zero = malloc(sizeof(long long));
         *zero = 0;
-        return zero;
+        return (void *)zero;
     }
-
-    char word[MAX_WORD];
-    int total = 0, word_occur = 0;
-    while (fscanf(fp, "%255s", word) == 1) {
-        if (strcmp(word, global_zbor) == 0) {
-            word_occur++;
+    for (int t = 0; t < 4; t++) {
+        if (delovi[t] < 0 || delovi[t] > 255) {
+            long long *zero = malloc(sizeof(long long));
+            *zero = 0;
+            return (void *)zero;
         }
-        total++;
     }
 
-    printf("Vo datotekata %s zborot %s se pojavuva %d pati od vkupno %d zborovi.\n",
-           ime_dat, global_zbor, word_occur, total);
-    fclose(fp);
-
-    int *result = malloc(sizeof(int));
-    *result = word_occur;
-    return (void *)result;
+    long long vkupno = 0;
+    for(int a = delovi[0]; a < 256; a++){
+        for(int b = (a==delovi[0] ? delovi[1] : 0); b < 256; b++){
+            for(int c = (a==delovi[0] && b==delovi[1] ? delovi[2] : 0); c < 256; c++){
+                for(int d = (a==delovi[0] && b==delovi[1] && c==delovi[2] ? delovi[3] : 0); d < 256; d++){
+                    vkupno++;
+                }
+            }
+        }
+    }
+    long long *rezultat = malloc(sizeof(long long));
+    *rezultat = vkupno;
+    return (void *)rezultat;
 }
+
+char ip_adresi[100][16];
 
 int main(int argc, char *argv[]){
-    char zbor_za_prebaruvanje[MAX_WORD];
-    char datoteki[MAX_FILES][MAX_NAME];
-    char *datoteki_ptrs[MAX_FILES];
-    int num_datoteki = 0;
-
-    if (argc < 2) {
-        printf("Vnesete zbor za prebaruvanje: ");
-        if (scanf("%255s", zbor_za_prebaruvanje) != 1) {
-            fprintf(stderr, "Nevaliden vnes.\n");
-            return 1;
-        }
-        num_datoteki = 3;
-        for (int i = 0; i < num_datoteki; i++) {
-            printf("Vnesi ime na datoteka %d: ", i+1);
-            if (scanf("%255s", datoteki[i]) != 1) {
-                fprintf(stderr, "Nevaliden vnes za datoteka.\n");
-                return 1;
-            }
-        }
-    } else if (argc == 2) {
-        strncpy(zbor_za_prebaruvanje, argv[1], MAX_WORD-1);
-        zbor_za_prebaruvanje[MAX_WORD-1] = '\0';
-        num_datoteki = 3;
-        for (int i = 0; i < num_datoteki; i++) {
-            printf("Vnesi ime na datoteka %d: ", i+1);
-            if (scanf("%255s", datoteki[i]) != 1) {
-                fprintf(stderr, "Nevaliden vnes za datoteka.\n");
-                return 1;
-            }
-        }
-    } else {
-        strncpy(zbor_za_prebaruvanje, argv[1], MAX_WORD-1);
-        zbor_za_prebaruvanje[MAX_WORD-1] = '\0';
-        num_datoteki = argc - 2;
-        if (num_datoteki > MAX_FILES) {
-            fprintf(stderr, "Prekumulno datoteki (maks %d). Koristam prvite %d.\n", MAX_FILES, MAX_FILES);
-            num_datoteki = MAX_FILES;
-        }
-        for (int i = 0; i < num_datoteki; i++) {
-            strncpy(datoteki[i], argv[i+2], MAX_NAME-1);
-            datoteki[i][MAX_NAME-1] = '\0';
-        }
+    if(argc <2){
+        printf("Nevaliden bron na argumenti.\n");
+        return 1;
     }
 
-    strncpy(global_zbor, zbor_za_prebaruvanje, MAX_WORD-1);
-    global_zbor[MAX_WORD-1] = '\0';
-
-    for (int i = 0; i < num_datoteki; i++) {
-        datoteki_ptrs[i] = datoteki[i];
+    FILE *fp = fopen(argv[1],"r");
+    if (fp == NULL){
+        printf("Ne mozam da ja otvoram datotekata %s\n",argv[1]);
+        return 1;
     }
 
-    pthread_t nitki[num_datoteki];
+    int broj_ip = 0;
 
-    for (int i = 0; i < num_datoteki; i++) {
-        if (pthread_create(&nitki[i], NULL, prebaraj_vo_datoteka, datoteki_ptrs[i]) != 0) {
-            fprintf(stderr, "Ne mozam da kreiram nitka za %s\n", datoteki_ptrs[i]);
-            // create a dummy result on the heap to keep join logic simple
-            int *zero = malloc(sizeof(int));
-            *zero = 0;
-        }
+    while(broj_ip < 100 && fscanf(fp, "%15s", ip_adresi[broj_ip]) == 1){
+        broj_ip++;
     }
 
-    int *counts = malloc(sizeof(int) * num_datoteki);
-    int total_occurrences = 0;
+    pthread_t nitki[broj_ip];
+    int n_br[broj_ip];
+    long long vkupno_ip = 0;
 
-    for (int i = 0; i < num_datoteki; i++) {
-        void *res;
-        pthread_join(nitki[i], &res);
-        if (res) {
-            counts[i] = *(int *)res;
-            free(res);
-        } else {
-            counts[i] = 0;
-        }
-        total_occurrences += counts[i];
+    for (int i=0;i<broj_ip;i++){
+        n_br[i]=i;
+        pthread_create(&nitki[i],NULL,najdi_ip_adresi,(void *)(n_br+i));
     }
 
-    // Printaj procenti na zastapenost
-    for (int i = 0; i < num_datoteki; i++) {
-        float pct = 0.0f;
-        if (total_occurrences > 0) pct = ((float)counts[i] / (float)total_occurrences) * 100.0f;
-        printf("Procent na pojavenost vo datotekata %s na zborot %s e %.2f%%\n",
-               datoteki_ptrs[i], global_zbor, pct);
+    void *rezultat;
+    for (int i=0;i<broj_ip;i++){
+        pthread_join(nitki[i], &rezultat);
+        vkupno_ip += *(long long *)rezultat;
+        free(rezultat);
     }
+    printf("Vkupno mogni IP adresi: %lld\n", vkupno_ip);
+        fclose(fp);
 
-    free(counts);
     return 0;
 }
+

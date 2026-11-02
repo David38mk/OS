@@ -3,62 +3,45 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdlib.h>
-#include <fcntl.h> 
+#include <fcntl.h>
 #include <string.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 
-int main(int argc, char *argv[]){
-    int pipe1[2], pipe2[2];
-    pid_t dete1, dete2;
-    pipe(pipe1);
-    dete1 = fork();
-    if(dete1>0){
-        close(pipe1[0]);
-        dup2(pipe1[1],1);
-        execlp("cat", "cat", "dat.txt", NULL);
-    }else{
-        pipe(pipe2);
-        dete2 = fork();
-        if(dete2>0){
-            close(pipe1[1]);
-            close(pipe2[0]);
-            int z;
-            scanf("%d",&z);
-            if(z==0){
-                dup2(pipe1[0],0);
-                dup2(pipe2[1],1);
-                execl("tail", "tail", 9, NULL);
+int main(int argc, char * argv[]){
+    int X;
+    int pipe[10][2];
+    pid_t dete[10];
+    scanf("%d",&X);
+    char *naredbi[X];
+    for(int i=0;i<X;i++){
+        scanf("%s",naredbi[i]);
+    }
+    for(int i=0;i<X;i++){
+        dete[i] = fork();
+        if(dete[i]==0){
+            if(i==0){
+                pipe(pipe[i]);
+                close(pipe[i][0]);
+                dup2(piep[i][1],1);
+                execlp(naredbi[i],naredbi[i],NULL);
+            }else if(i==X-1){
+                close(pipe[i-1][1]);
+                dup2(pipe[i-1][0],0);
+                execlp(naredbi[i],naredbi[i],NULL);
             }else{
-                char buffer[1024];
-                ssize_t procitano;
-                while ((procitano = read(pipe1[0],buffer,1024))>0)
-                {
-                    buffer[procitano] = '\0'
-                    printf("%s",buffer);
-                }
-                dup2(pipe2[1],1);
-                execl("tail", "tail", "9", NULL);
+                pipe[i];
+                close(pipe[i-1][1]);
+                close(pipe[i][0]);
+                dup2(pipe[i-1][0],0);
+                dup2(piep[i][1],1);
+                execlp(naredbi[i],naredbi[i],NULL);
             }
         }else{
-            close(pipe2[1]);
-            int z;
-            scanf("%d",&z);
-            if(z==0){
-                dup2(pipe2[0],0);
-                execl("wc", "wc", "-c", NULL);
-            }else{
-                char buffer[1024];
-                ssize_t procitano;
-                while ((procitano = read(pipe1[0],buffer,1024))>0)
-                {
-                    buffer[procitano] = '\0'
-                    printf("%s",buffer);
-                }
-                execl("wc", "wc", "-c", NULL);
-            }
+            break;
         }
     }
+    wait(NULL);
     return 0;
 }

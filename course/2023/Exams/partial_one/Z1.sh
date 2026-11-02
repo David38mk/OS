@@ -1,42 +1,37 @@
 #!/bin/bash
 
-if [ "$#" -lt 3 ]; then
-    echo "Nedovolno argumenti vo komandna linija"
-    exit 1
-else
-    if [[ "$1" == *.py3 ]]; then
-        python_scripta=$1
-    else
-        python_scripta="prva.py3"
-    fi
-fi
+z=( $(find . -type f -name '*.ip') )
 
-zbor=$2
-prebaruvanje=$(find . -type f -name "$python_scripta")
+if [ ${#z[@]} -gt 0 ]; then
+    for file in "${z[@]}"; do
+        
+        out="${file}_out.txt"
 
-if [ -n "$prebaruvanje" ]; then
-    shift
-    shift
-    vkupno=0
+        # Create empty file
+        touch "$out"
 
-    for dat in "$@"; do
-        z=$(./"$python_scripta" f "$dat")
-        vkupno=$((vkupno + z))
-        echo "${dat}: ${z}"
+        # Run python script
+        ./python_sript "$file" o "$out"
+
+        # Read file line by line using `for`
+        for IP in $(cat "$out"); do
+            ping -c 1 "$IP" > /dev/null 2>&1
+            komand=$?
+            
+            if [ $komand -eq 0 ]; then
+                echo "$IP OK"
+            else
+                echo "$IP NOT OK"
+            fi
+        done
+
     done
-
-    echo "Vkupno: ${vkupno}"
-else
-    echo "Ne e pronajden skriptot: $python_scripta"
 fi
 
-#  Да се напише SHELL скрипта која како аргумент добива име на Python скрипта, збор за
-# пребарување и листа од имиња на датотеки. Доколку не добие како прв аргумент име на Python
-# скрипта (аргумент што завршува на .py3) тогаш зема како име на скрипта „prva.py3“. Shell
-# скриптата треба да провери дали има Python скрипта со такво име во тековниот директориум
-# или поддиректориумите и доколку нема, завршува Shell скриптата со извршување. Доколку
-# постои Python скрипта со такво име (тековниот директориум или поддиректориумите), тогаш
-# Shell скриптата треба со помош на Python скриптата, да најде и отпечати на екран, колку пати ќе
-# го пронајде зборот (што се праќа како втор аргумент на Shell) за сите датотеки што се праќаат
-# како аргументи (од трет аргумент па натаму). На крај скриптата треба да отпечати колку
-# вкупно бил пронајден зборот во сите датотеки. 
+# Да се напише SHELL скрипта која треба да ги најде сите датотеки (во тековниот директориум и
+# поддиректориумите) кои имаат наставка (екстензија) „.ip“. Потоа, користејќи ја Python
+# скриптата од првата задача, да се генерираат сите можни IP адреси од секоја пронајдена
+# датотека одделно. Откако ќе се изгенерираат IP адресите, за секоја IP адреса да се провери дали
+# има пристап до истата, и анализата да се испише на екран (да се испише секоја IP адреса и до
+# истата ОК или NOT во продолжение). Проверката дали има пристап или не до дадена IP адреса
+# да се прави со наредбата „ping -c 1 $IP > /dev/null 2>&1; “

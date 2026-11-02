@@ -13,4 +13,4 @@ All lab work from before 2026/27. Two lab series ended up here (the task sheets 
 | Lab5 | `threads/Z1.c` | Threads reading a file given as argument through mmap. |
 | Lab6 | `Z1.c`, `Z2.c` | Pipes: Z1 pipe + files, Z2 fork + exec + pipe. |
 
-Build from the repo root with `./run.sh course/2026/Labs/Lab4/Z1.c`, or by hand with `gcc -Wall -pthread Z1.c -o bin/Z1` (Linux or WSL).
+Build from the repo root with `./run.sh course/2025/Labs/Lab4/Z1.c`, or by hand with `gcc -Wall -pthread Z1.c -o bin/Z1` (Linux or WSL).

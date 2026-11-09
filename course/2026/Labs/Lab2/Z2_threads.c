@@ -32,7 +32,7 @@ struct Job {
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
-// Monoton chasovnik so delovi od sekunda (vidi komentar vo Z2.c: time() ima
+// Monoton chasovnik so delovi od sekunda (vidi komentar vo Z2_S.c: time() ima
 // rezolucija od 1 s i bi dalo predvremen timeout).
 static double now_s(void)
 {
@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
             pthread_join(tid[i], NULL);
 
     for (int i = 0; i < n; i++) {
-        // TIMEOUT se prikazhuva so T sekundi (kako vo Z2.c)
+        // TIMEOUT se prikazhuva so T sekundi (kako vo Z2_S.c)
         int secs = (jobs[i].status[0] == 'T') ? T : jobs[i].secs;
         printf("%s %s (%d s)\n", jobs[i].host, jobs[i].status, secs);
     }

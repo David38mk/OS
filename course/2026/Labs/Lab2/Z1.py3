@@ -16,80 +16,107 @@
 # Доколку како трет аргумент се наведе знаменцето `-b`, скриптата дополнително ги запишува сомнителните IP
 # адреси во датотека `blocklist.txt`, по една адреса во линија. Линии кои не го следат форматот да се прескокнат.
 #
-# Конвенции на излезот (текстот не ги определува, ги определуваат објавените датотеки):
-#   - статус кодовите растечки
-#   - топ 3 IP по број на барања опаѓачки; при изедначување важи редоследот на прво појавување
-#   - сомнителните IP по редоследот на прво појавување во логот, по една линија за секој (IP, минута) над N
-import re
+# ПОЕДНОСТАВЕНА ВЕРЗИЈА: без регуларни изрази, само readlines() и split(). Истиот излез како Z1_S.py3 (верзијата со регуларен израз).
+# Една валидна линија по split() има точно 10 зборови:
+#   0: IP    1: -    2: -    3: [03/Nov/2025:15:17:02    4: +0100]
+#   5: "GET  6: /index.html  7: HTTP/1.1"  8: 200  9: 1043
+# Линија што нема 10 зборови, или кај која статусот и бајтите не се броеви, не го следи форматот и се прескокнува.
+# Минутата е зборот 3 без „[“ на почетокот и без „:СС“ на крајот: 03/Nov/2025:15:17
 import sys
 
 if len(sys.argv) < 2:
     print("Greshka: ne e navedena vlezna datoteka", file=sys.stderr)
     sys.exit(1)
 
-fname = sys.argv[1]
+ime = sys.argv[1]
 N = 10
-write_block = False
+zapishi_blok = False
 for arg in sys.argv[2:]:
     if arg == "-b":
-        write_block = True
+        zapishi_blok = True
+    elif arg.isdigit():
+        N = int(arg)
     else:
-        try:
-            N = int(arg)
-        except ValueError:
-            print("Greshka: N mora da bide cel broj", file=sys.stderr)
-            sys.exit(1)
-
-# IP - - [dd/Mon/yyyy:HH:MM:SS +zzzz] "request" status bytes
-pat = re.compile(
-    r'^(\S+) \S+ \S+ \[(\d{2}/[A-Za-z]{3}/\d{4}:\d{2}:\d{2}):\d{2} [+-]\d{4}\] '
-    r'"[^"]*" (\d{3}) (\d+)$'
-)
-
-status = {}   # code -> [requests, bytes]
-per_ip = {}   # ip -> requests            (insertion order = first appearance)
-per_min = {}  # ip -> {minute: requests}  (insertion order = first appearance)
+        print("Greshka: N mora da bide cel broj", file=sys.stderr)
+        sys.exit(1)
 
 try:
-    f = open(fname, "r")
+    f = open(ime, "r")
 except OSError:
-    print(f"Greshka: ne mozham da ja otvoram datotekata {fname}", file=sys.stderr)
+    print("Greshka: ne mozham da ja otvoram datotekata", ime, file=sys.stderr)
     sys.exit(1)
+linii = f.readlines()
+f.close()
 
-with f:
-    for line in f:
-        m = pat.match(line.rstrip("\r\n"))
-        if not m:
-            continue  # line does not follow the format
-        ip, minute, code, nbytes = m.group(1), m.group(2), int(m.group(3)), int(m.group(4))
-        st = status.setdefault(code, [0, 0])
-        st[0] += 1
-        st[1] += nbytes
-        per_ip[ip] = per_ip.get(ip, 0) + 1
-        mins = per_min.setdefault(ip, {})
-        mins[minute] = mins.get(minute, 0) + 1
+statusi = {}     # status -> [broj baranja, bajti]
+broj_ip = {}     # ip -> broj baranja
+po_minuta = {}   # ip -> {minuta: broj baranja}
 
-total_req = sum(v[0] for v in status.values())
-total_bytes = sum(v[1] for v in status.values())
-for code in sorted(status):
-    print(f"Status {code}: {status[code][0]} baranja, {status[code][1]} bajti")
-print(f"Vkupno: {total_req} baranja, {total_bytes} bajti")
+for linija in linii:
+    zborovi = linija.split()
+    if len(zborovi) != 10:
+        continue
+    ip = zborovi[0]
+    vreme = zborovi[3]        # [03/Nov/2025:15:17:02
+    status = zborovi[8]
+    bajti = zborovi[9]
+    if not vreme.startswith("[") or not status.isdigit() or not bajti.isdigit():
+        continue
+    minuta = vreme[1:-3]      # 03/Nov/2025:15:17
+    status = int(status)
+    bajti = int(bajti)
 
+    if status not in statusi:
+        statusi[status] = [0, 0]
+    statusi[status][0] += 1
+    statusi[status][1] += bajti
+
+    if ip not in broj_ip:
+        broj_ip[ip] = 0
+    broj_ip[ip] += 1
+
+    if ip not in po_minuta:
+        po_minuta[ip] = {}
+    if minuta not in po_minuta[ip]:
+        po_minuta[ip][minuta] = 0
+    po_minuta[ip][minuta] += 1
+
+# 1. statistika po status, rastecki, pa vkupno
+vkupno_baranja = 0
+vkupno_bajti = 0
+for status in sorted(statusi):
+    broj, bajti = statusi[status]
+    print(f"Status {status}: {broj} baranja, {bajti} bajti")
+    vkupno_baranja += broj
+    vkupno_bajti += bajti
+print(f"Vkupno: {vkupno_baranja} baranja, {vkupno_bajti} bajti")
+
+# 2. trite najaktivni IP adresi (sorted e stabilen: pri ist broj ostanuva redosledot na pojavuvanje)
 print("Najaktivni IP adresi:")
-for ip, cnt in sorted(per_ip.items(), key=lambda kv: -kv[1])[:3]:
-    print(f"{ip} {cnt}")
+podredeni = sorted(broj_ip.items(), key=lambda par: par[1], reverse=True)
+for ip, broj in podredeni[:3]:
+    print(f"{ip} {broj}")
 
-suspicious = [(ip, minute, cnt)
-              for ip, mins in per_min.items()
-              for minute, cnt in mins.items() if cnt > N]
-if suspicious:
-    print(f"Somnitelni IP adresi (povekje od {N} baranja vo edna minuta):")
-    for ip, minute, cnt in suspicious:
-        print(f"{ip} ({cnt} baranja vo {minute})")
-else:
+# 3. somnitelni: povekje od N baranja vo ista minuta (recnicite go cuvaat redosledot na vnesuvanje)
+somnitelni = []   # lista od (ip, minuta, broj)
+for ip in po_minuta:
+    for minuta in po_minuta[ip]:
+        if po_minuta[ip][minuta] > N:
+            somnitelni.append((ip, minuta, po_minuta[ip][minuta]))
+
+if len(somnitelni) == 0:
     print(f"Somnitelni IP adresi (povekje od {N} baranja vo edna minuta): nema")
+else:
+    print(f"Somnitelni IP adresi (povekje od {N} baranja vo edna minuta):")
+    for ip, minuta, broj in somnitelni:
+        print(f"{ip} ({broj} baranja vo {minuta})")
 
-if write_block:
-    with open("blocklist.txt", "w") as out:
-        for ip in dict.fromkeys(ip for ip, _, _ in suspicious):
-            out.write(ip + "\n")
+# -b: sekoja somnitelna IP ednash vo blocklist.txt
+if zapishi_blok:
+    f = open("blocklist.txt", "w")
+    zapishani = []
+    for ip, minuta, broj in somnitelni:
+        if ip not in zapishani:
+            zapishani.append(ip)
+            f.write(ip + "\n")
+    f.close()

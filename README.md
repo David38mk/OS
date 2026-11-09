@@ -51,9 +51,13 @@ docker exec -it oslab bash          # same shell without ssh
 docker compose down                 # stop
 ```
 
-Inside: `cd ~/OS`, then `./run.sh course/2024/Exams/partial_one/Z3.c ...` or `bash tests/run_tests.sh` in a lab folder. Kernel-module (driver) tasks cannot be built here; only a real VM can load modules.
+Inside: `cd ~/OS`, then `./run.sh course/2024/Exams/partial_one/Z3.c ...` or `bash tests/run_tests.sh` in a lab folder. Kernel-module (driver) tasks compile here against the generic kernel headers, but only a real Linux machine can load them.
 
 Full instructions, maintenance and an explanation of how containers, WSL2 and the bind mount work: [docker/README.md](docker/README.md).
+
+## Study material
+
+[course/cheatsheets/](course/cheatsheets/README.md): one cheat sheet per topic (shell, Python, C toolbox, processes, threads, pipes, shared memory, drivers), written from the tasks in this repo, with runnable examples under `course/cheatsheets/examples/` and a map from every past exam task to the sheets it needs.
 
 ## Exams
 

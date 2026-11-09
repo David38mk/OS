@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         openssh-server sudo \
         bash-completion vim nano less tree file bc dos2unix \
         psmisc procps lsof strace shellcheck iputils-ping \
+        linux-headers-generic libelf-dev kmod \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

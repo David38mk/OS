@@ -99,7 +99,7 @@ docker exec -it -u david -w /home/david/OS oslab bash
 
 ### What it cannot do
 
-- **Kernel modules (the driver tasks).** Containers borrow the kernel, they cannot change it (part 3 explains why). Those tasks are compile-by-reading only.
+- **Loading kernel modules (the driver tasks).** Containers borrow the kernel, they cannot change it (part 3 explains why). Modules can still be *compiled*: the image carries `linux-headers-generic`, so `make -C /lib/modules/$(ls /lib/modules | head -1)/build M=$PWD modules` builds a `.ko` and catches every syntax and API error. Only `insmod` needs the lab PC. See `course/cheatsheets/drivers.md`.
 - **Graphics.** No desktop, no browser.
 - **`systemd` services.** The container runs exactly one program, sshd.
 

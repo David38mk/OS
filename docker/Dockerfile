@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-pip \
         openssh-server sudo \
         bash-completion vim nano less tree file bc dos2unix \
-        psmisc procps lsof strace shellcheck \
+        psmisc procps lsof strace shellcheck iputils-ping \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

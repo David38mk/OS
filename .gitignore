@@ -5,3 +5,6 @@ bin/
 a.out
 lab31
 __pycache__/
+
+# Word lock files
+~$*

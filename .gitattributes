@@ -1,6 +1,10 @@
-# Scripts run on Linux/WSL, so keep LF in the working copy even on Windows
+# Everything in this repo targets Linux: every text file keeps LF in the working copy, even on Windows
+* text=auto eol=lf
+
 *.sh   text eol=lf
 *.py   text eol=lf
 *.py3  text eol=lf
 *.pdf  binary
 *.docx binary
+*.txt  text eol=lf
+*.log  text eol=lf

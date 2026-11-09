@@ -81,6 +81,7 @@ docker exec -it -u david -w /home/david/OS oslab bash
 | `shellcheck s.sh` | lint a shell script |
 | `dos2unix f` | fix a file that was saved with Windows line endings |
 | `pgrep`, `ps`, `kill`, `lsof` | process tasks |
+| `ping` | the Lab 2 health checker; `192.0.2.1` never answers, `nepostoi.example` fails DNS at once |
 | `man 2 fork`, `man 3 pthread_create` | the manual pages the exams assume |
 | `sudo` | works without a password |
 

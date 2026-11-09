@@ -1,0 +1,6 @@
+-rw-rw-r--  1 goranj goranj   826 2025-10-28 17:29 nitki1.c
+
+-rwxrwxr-x  1 goranj goranj 16264 2025-10-28 17:31 pp1
+
+-rw-rw-r--  1 goranj goranj   871 2025-10-28 17:31 primer1.c
+

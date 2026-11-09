@@ -1,0 +1,15 @@
+Status 200: 158 baranja, 638194 bajti
+Status 301: 3 baranja, 693 bajti
+Status 304: 22 baranja, 0 bajti
+Status 401: 34 baranja, 7854 bajti
+Status 403: 18 baranja, 3582 bajti
+Status 404: 26 baranja, 5096 bajti
+Status 500: 2 baranja, 624 bajti
+Vkupno: 263 baranja, 656043 bajti
+Najaktivni IP adresi:
+10.0.0.7 42
+192.168.1.20 36
+172.16.0.9 25
+Somnitelni IP adresi (povekje od 10 baranja vo edna minuta):
+172.16.0.9 (25 baranja vo 03/Nov/2025:15:17)
+185.220.101.4 (14 baranja vo 04/Nov/2025:02:31)

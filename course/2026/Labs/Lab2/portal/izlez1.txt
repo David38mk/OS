@@ -1,0 +1,9 @@
+Status 200: 6 baranja, 12973 bajti
+Status 401: 4 baranja, 924 bajti
+Status 404: 1 baranja, 196 bajti
+Vkupno: 11 baranja, 14093 bajti
+Najaktivni IP adresi:
+192.168.1.20 5
+10.0.0.7 3
+10.0.0.9 2
+Somnitelni IP adresi (povekje od 10 baranja vo edna minuta): nema
